@@ -26,7 +26,7 @@ from .kafka_producer import get_producer
 
 
 # DLQ configuration
-DLQ_TOPIC = 'scoring.results.dlq'
+DLQ_TOPIC = 'audio.ready.dlq'  # Updated for STT pipeline
 REQUEUE_TOPIC = 'audio.ready'  # Topic to requeue failed messages
 MAX_RETRIES = 3  # Maximum retry attempts before permanent failure
 

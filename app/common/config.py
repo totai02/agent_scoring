@@ -24,19 +24,15 @@ class Settings(BaseSettings):
     
     # External service URLs
     avaya_base_url: str = "http://localhost:8000"
-    scoring_service_url: str = "http://localhost:8080/scoring"
     
     # Kafka configuration
     kafka_bootstrap: str = "localhost:9092"
-    kafka_group_ingestion: str = "ingestion-group"
     kafka_group_download: str = "download-group"
-    kafka_group_scoring: str = "scoring-group"
     
     # Kafka topics
     topic_calls_raw: str = "calls.raw"
     topic_calls_enriched: str = "calls.enriched"
     topic_audio_ready: str = "audio.ready"
-    topic_scoring_results: str = "scoring.results"
     
     # S3/Object storage configuration
     s3_bucket: str = "ccas-audio-dev"

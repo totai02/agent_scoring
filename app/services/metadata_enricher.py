@@ -11,12 +11,13 @@ from datetime import datetime
 def parse_agent(raw_agent: str | None) -> str | None:
     if not raw_agent:
         return None
-    # crude extraction: agent1234.247 -> take before '.' and drop 'agent'
+    # Format: "2665 (agent2801.247)" -> extract "2801"
     if 'agent' in raw_agent:
-        for token in raw_agent.split():
-            if token.startswith('agent'):
-                token = token.split('.')[0]
-                return token.replace('agent','')
+        # Find the part in parentheses
+        import re
+        match = re.search(r'agent(\d+)', raw_agent)
+        if match:
+            return match.group(1)
     return None
 
 async def run_enricher():

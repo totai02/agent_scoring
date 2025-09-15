@@ -59,11 +59,17 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   create-bucket:
     image: minio/mc:latest
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       set -e; \
@@ -72,6 +78,31 @@ services:
       mc anonymous set download local/ccas-audio-dev/raw || true; \
       echo 'bucket ready'; \
       sleep 2"
+
+  create-kafka-topics:
+    image: bitnami/kafka:3.4.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Creating Kafka topics...'; \
+      kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic calls.raw --partitions 3 --replication-factor 1; \
+      kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic calls.enriched --partitions 3 --replication-factor 1; \
+      kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic audio.ready --partitions 3 --replication-factor 1; \
+      kafka-topics.sh --bootstrap-server kafka-1:9092 --create --if-not-exists --topic audio.ready.dlq --partitions 3 --replication-factor 1; \
+      echo 'Kafka topics created successfully'; \
+      "
+
+  run-migrations:
+    build: .
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    volumes:
+      - .:/usr/src/app
 
   avaya-mock:
     build: .
@@ -103,6 +134,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      run-migrations:
+        condition: service_completed_successfully
     env_file: .env
     volumes:
       - .:/usr/src/app
@@ -114,21 +147,23 @@ services:
       kafka:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     env_file: .env
     volumes:
       - .:/usr/src/app
     ports:
       - "9200:9200"
 
-  scoring-consumer:
+  stt-consumer:
     build: .
-    command: python -m app.services.scoring_consumer
+    command: python -m app.services.stt_consumer
     depends_on:
       kafka:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     env_file: .env
     volumes:
       - .:/usr/src/app

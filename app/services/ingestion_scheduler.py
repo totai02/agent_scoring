@@ -53,13 +53,16 @@ async def poll_once():
     for result in root.findall('result'):
         call_id_field = result.find(".//field[@name='inums']")
         started_field = result.find(".//field[@name='startedat']")
+        agents_field = result.find(".//field[@name='agents']")
         if call_id_field is None or started_field is None:
             continue
         call_id = call_id_field.text.strip()
         started_at = started_field.text.strip()
+        raw_agent = agents_field.text.strip() if agents_field is not None else None
         payload = {
             "call_id": call_id,
             "started_at": started_at,
+            "raw_agent": raw_agent,
         }
         producer.produce(settings.topic_calls_raw, key=call_id, value=json.dumps(payload))
         count += 1

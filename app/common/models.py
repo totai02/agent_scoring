@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, DateTime, Numeric, Integer, JSON, Text, Boolean, ForeignKey
+from sqlalchemy import Column, BigInteger, String, DateTime, Numeric, Integer, JSON, Text, Boolean, ForeignKey, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.common.db import Base
@@ -12,10 +12,11 @@ class Call(Base):
     customer_id = Column(String(32))
     skill = Column(String(64))
     status = Column(String(32), nullable=False, default='PENDING_DOWNLOAD')
+    processed_at = Column(DateTime)  # Timestamp when STT processing completed
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     audio_asset = relationship('AudioAsset', uselist=False, back_populates='call')
-    scores = relationship('ScoringResult', back_populates='call')
+    transcript_segments = relationship('TranscriptSegment', back_populates='call')
 
 class AudioAsset(Base):
     __tablename__ = 'audio_asset'
@@ -30,17 +31,6 @@ class AudioAsset(Base):
     status = Column(String(16), nullable=False, default='READY')
     created_at = Column(DateTime, server_default=func.now())
     call = relationship('Call', back_populates='audio_asset')
-
-class ScoringResult(Base):
-    __tablename__ = 'scoring_result'
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    call_id = Column(String(32), ForeignKey('call.call_id', ondelete='CASCADE'))
-    score = Column(Numeric(5,2), nullable=False)
-    model_version = Column(String(32))
-    details = Column(JSON)
-    latency_ms = Column(Integer)
-    created_at = Column(DateTime, server_default=func.now())
-    call = relationship('Call', back_populates='scores')
 
 class IngestionCheckpoint(Base):
     __tablename__ = 'ingestion_checkpoint'
@@ -59,3 +49,16 @@ class Agent(Base):
     active = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+class TranscriptSegment(Base):
+    __tablename__ = "transcript_segments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    call_id = Column(String, ForeignKey("call.call_id"), nullable=False, index=True)
+    speaker = Column(String, nullable=True, index=True)
+    start_time = Column(Float, nullable=False)
+    end_time = Column(Float, nullable=False)
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    call = relationship("Call", back_populates='transcript_segments')

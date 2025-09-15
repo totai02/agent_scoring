@@ -62,6 +62,25 @@ async def worker_task(semaphore: asyncio.Semaphore, call_id: str, producer):
                 audio = await download_audio(call_id)
                 sha = hashlib.sha256(audio).hexdigest()
                 key = await upload_to_s3(call_id, audio)
+                
+                # Update database status to AUDIO_READY
+                from app.common.db import get_session
+                from app.common.models import Call, AudioAsset
+                with get_session() as sess:
+                    call = sess.query(Call).filter_by(call_id=call_id).first()
+                    if call:
+                        call.status = 'AUDIO_READY'
+                        # Create AudioAsset record
+                        audio_asset = AudioAsset(
+                            call_id=call_id,
+                            s3_key=key,
+                            sha256=sha,
+                            size_bytes=len(audio),
+                            status='READY'
+                        )
+                        sess.add(audio_asset)
+                        sess.commit()
+                
                 payload = {"call_id": call_id, "s3_key": key, "sha256": sha}
                 import json
                 producer.produce(settings.topic_audio_ready, key=call_id, value=json.dumps(payload))
@@ -86,7 +105,7 @@ async def run_downloader():
         'group.id': settings.kafka_group_download,
         'auto.offset.reset': 'earliest'
     })
-    consumer.subscribe([settings.topic_calls_raw])
+    consumer.subscribe([settings.topic_calls_enriched])
     producer = get_producer()
     semaphore = asyncio.Semaphore(settings.max_download_concurrency)
 

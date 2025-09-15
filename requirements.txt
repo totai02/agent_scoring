@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+httpx
+confluent-kafka
+pydantic
+SQLAlchemy
+psycopg2-binary
+boto3
+prometheus-client
+alembic

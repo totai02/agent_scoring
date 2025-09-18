@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Production scaling configuration for STT Consumer
+  stt-consumer:
+    deploy:
+      replicas: 4  # Scale to 4 instances in production
+      resources:
+        limits:
+          memory: 4g
+          cpus: 4.0
+        reservations:
+          memory: 2g
+          cpus: 2.0
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    environment:
+      - STT_MAX_WORKERS=6
+      - DB_POOL_SIZE=15
+      - DB_MAX_OVERFLOW=30
+      - WHISPER_DEVICE=cpu
+      - WHISPER_MODEL_SIZE=base
+      - STT_BATCH_SIZE=20
+      - POLL_TIMEOUT=0.5
+      - DB_HOST=postgres
+      - KAFKA_BOOTSTRAP=kafka-1:9092,kafka-2:9093
+      - S3_ENDPOINT=http://minio:9000
+
+  # Optional: Scale Kafka for higher throughput
+  kafka-2:
+    image: bitnami/kafka:3.4.1
+    container_name: kafka-2
+    ports:
+      - "9093:9093"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-2:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_BROKER_ID=2
+    healthcheck:
+      test: ["CMD", "kafka-topics.sh", "--bootstrap-server", "kafka-2:9093", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - kafka_data_2:/bitnami/kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+
+  # Scale postgres for better performance
+  postgres:
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c max_connections=200
+    environment:
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: pg_stat_statements
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres.conf:/etc/postgresql/postgresql.conf
+
+volumes:
+  kafka_data_2:

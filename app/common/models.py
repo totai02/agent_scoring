@@ -43,7 +43,7 @@ class Call(Base):
         String(32), 
         nullable=False, 
         default='PENDING_DOWNLOAD',
-        comment='Current processing status: PENDING_DOWNLOAD, AUDIO_READY, COMPLETED'
+        comment='Current processing status: PENDING_DOWNLOAD, AUDIO_READY, PROCESSING, COMPLETED'
     )
     processed_at = Column(
         DateTime,

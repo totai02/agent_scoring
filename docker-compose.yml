@@ -101,6 +101,12 @@ services:
       postgres:
         condition: service_healthy
     env_file: .env
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=agent_scoring
+      - DB_USER=agent
+      - DB_PASSWORD=agentpw
     volumes:
       - .:/usr/src/app
 
@@ -121,6 +127,9 @@ services:
       avaya-mock:
         condition: service_started
     env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP=kafka-1:9092
+      - AVAYA_BASE_URL=http://avaya-mock:8000
     volumes:
       - .:/usr/src/app
     ports:
@@ -137,6 +146,9 @@ services:
       run-migrations:
         condition: service_completed_successfully
     env_file: .env
+    environment:
+      - DB_HOST=postgres
+      - KAFKA_BOOTSTRAP=kafka-1:9092
     volumes:
       - .:/usr/src/app
 
@@ -149,6 +161,9 @@ services:
       minio:
         condition: service_healthy
     env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP=kafka-1:9092
+      - S3_ENDPOINT=http://minio:9000
     volumes:
       - .:/usr/src/app
     ports:
@@ -165,8 +180,20 @@ services:
       postgres:
         condition: service_healthy
     env_file: .env
+    environment:
+      - STT_MAX_WORKERS=4
+      - DB_POOL_SIZE=10
+      - WHISPER_DEVICE=cpu
+      - WHISPER_MODEL_SIZE=base
+      - DB_HOST=postgres
+      - KAFKA_BOOTSTRAP=kafka-1:9092
+      - S3_ENDPOINT=http://minio:9000
     volumes:
       - .:/usr/src/app
+    deploy:
+      replicas: 2  # Run 2 instances by default
+    mem_limit: 8g
+    cpus: 6.0
 
   dlq-consumer:
     build: .
@@ -175,6 +202,8 @@ services:
       kafka:
         condition: service_healthy
     env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP=kafka-1:9092
     volumes:
       - .:/usr/src/app
 

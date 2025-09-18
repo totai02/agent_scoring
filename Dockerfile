@@ -7,6 +7,9 @@ WORKDIR /usr/src/app
 # Install system dependencies that might be needed
 RUN apt-get update && apt-get install -y --no-install-recommends \
     netcat-openbsd \
+    build-essential \
+    pkg-config \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container

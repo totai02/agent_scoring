@@ -92,7 +92,7 @@ def generate_daily_calls(date: datetime.date) -> List[Dict[str, Any]]:
     seconds_in_day = 24 * 3600
     
     # Generate unique random timestamps for the day
-    chosen_seconds = random.sample(range(seconds_in_day), 10000)
+    chosen_seconds = random.sample(range(seconds_in_day), 4000)
 
     for sec in chosen_seconds:
         # Calculate call timestamp

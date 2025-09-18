@@ -48,15 +48,22 @@ def init_engine():
     global _engine, _SessionLocal
     
     if _engine is None:
-        if not settings.database_url:
-            raise RuntimeError(
-                "DATABASE_URL not configured. Please set the database_url "
-                "in your .env file or environment variables."
-            )
+        # Build database URL from individual settings for better Docker compatibility
+        database_url = (
+            f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}"
+            f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+        )
+        
+        # Use DATABASE_URL only if DB_HOST is not explicitly set (for local development)
+        import os
+        if settings.database_url and not os.getenv('DB_HOST'):
+            db_url = settings.database_url
+        else:
+            db_url = database_url
         
         # Create engine with connection health checks
         _engine = create_engine(
-            settings.database_url, 
+            db_url, 
             pool_pre_ping=True,
             echo=False  # Set to True for SQL logging in development
         )

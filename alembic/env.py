@@ -27,9 +27,19 @@ from app.common import models  # noqa: F401 - Import needed to register models
 # Alembic configuration object
 config = context.config
 
+# Build database URL from individual settings for better Docker compatibility
+database_url = (
+    f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}"
+    f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
+)
+
 # Inject runtime database URL from settings
-if settings.database_url:
+if settings.database_url and not os.getenv('DB_HOST'):
+    # Use DATABASE_URL only if DB_HOST is not explicitly set (for local development)
     config.set_main_option('sqlalchemy.url', settings.database_url)
+else:
+    # Use individual DB settings (for Docker environment)
+    config.set_main_option('sqlalchemy.url', database_url)
 
 # Configure logging if config file exists
 if config.config_file_name is not None:

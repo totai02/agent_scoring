@@ -5,10 +5,15 @@ confluent-kafka
 pydantic
 pydantic-settings
 SQLAlchemy
-psycopg2-binary
+psycopg2-binary==2.9.5
 boto3
 prometheus-client
 alembic
-faster-whisper
+# Whisper dependencies with compatible versions
+ctranslate2>=4.0,<5
+huggingface-hub>=0.13
+tokenizers>=0.13,<1
+av>=11.0,<13
+faster-whisper==1.0.3
 torch
 torchaudio

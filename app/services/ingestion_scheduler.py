@@ -26,6 +26,7 @@ import httpx
 from prometheus_client import Counter, Histogram, start_http_server
 
 from app.common.config import settings
+from app.common.redis_client import get_call_tracker
 from .kafka_producer import get_producer
 
 
@@ -34,6 +35,7 @@ _last_polled_to: Optional[dt.datetime] = None
 
 # Prometheus metrics
 INGEST_CALLS = Counter('ingest_calls_total', 'Total calls ingested')
+INGEST_CALLS_SKIPPED = Counter('ingest_calls_skipped_total', 'Total calls skipped due to tracking')
 INGEST_WINDOW_SECONDS = Histogram(
     'ingest_window_span_seconds', 
     'Time span in seconds of each poll window'
@@ -103,9 +105,12 @@ async def poll_once() -> Tuple[int, dt.datetime, dt.datetime]:
     # Parse XML response
     root = ET.fromstring(xml_text)
     
-    # Process and publish call events
-    producer = get_producer()
-    count = 0
+    # Get call tracker for duplicate prevention
+    call_tracker = get_call_tracker()
+    
+    # First pass: collect all call IDs from the response
+    call_candidates = set()
+    call_data = {}  # Store call data by call_id for later processing
     
     for result in root.findall('result'):
         # Extract required fields
@@ -122,12 +127,30 @@ async def poll_once() -> Tuple[int, dt.datetime, dt.datetime]:
         started_at = started_field.text.strip()
         raw_agent = agents_field.text.strip() if agents_field is not None else None
         
-        # Prepare message payload
-        payload = {
+        call_candidates.add(call_id)
+        call_data[call_id] = {
             "call_id": call_id,
             "started_at": started_at,
             "raw_agent": raw_agent,
         }
+    
+    # Filter out calls that are already being tracked
+    untracked_calls = await call_tracker.filter_tracked_calls(call_candidates)
+    skipped_count = len(call_candidates) - len(untracked_calls)
+    
+    if skipped_count > 0:
+        print(f"[ingestion] Skipped {skipped_count} calls already being tracked")
+        INGEST_CALLS_SKIPPED.inc(skipped_count)
+    
+    # Process and publish only untracked calls
+    producer = get_producer()
+    count = 0
+    
+    for call_id in untracked_calls:
+        payload = call_data[call_id]
+        
+        # Start tracking this call to prevent duplicate processing
+        await call_tracker.track_call(call_id)
         
         # Publish to Kafka
         producer.produce(
@@ -161,6 +184,10 @@ async def run_scheduler() -> None:
     start_http_server(9100)
     print("[ingestion] Prometheus metrics server started on port 9100")
     
+    # Get call tracker for periodic cleanup and stats
+    call_tracker = get_call_tracker()
+    
+    iteration = 0
     while True:
         try:
             count, start_time, end_time = await poll_once()
@@ -168,6 +195,17 @@ async def run_scheduler() -> None:
                 f"[ingestion] Processed {count} calls for window "
                 f"{start_time} -> {end_time}"
             )
+            
+            # Periodic reporting of tracking stats (every 10 iterations)
+            iteration += 1
+            if iteration % 10 == 0:
+                try:
+                    stats = await call_tracker.get_tracking_stats()
+                    if "tracked_calls" in stats:
+                        print(f"[ingestion] Currently tracking {stats['tracked_calls']} active calls")
+                except Exception as stats_ex:
+                    print(f"[ingestion][warning] Failed to get tracking stats: {stats_ex}")
+                    
         except Exception as ex:
             print(f"[ingestion][error] Failed to poll: {ex}")
         
@@ -175,5 +213,37 @@ async def run_scheduler() -> None:
         await asyncio.sleep(settings.poll_interval_seconds)
 
 
+async def cleanup_call_tracking() -> None:
+    """
+    Manual cleanup function for call tracking entries.
+    
+    This function can be used for maintenance or debugging purposes
+    to clear all call tracking entries from Redis.
+    """
+    call_tracker = get_call_tracker()
+    try:
+        stats = await call_tracker.get_tracking_stats()
+        if stats.get("tracked_calls", 0) > 0:
+            print(f"[ingestion] Found {stats['tracked_calls']} tracked calls")
+            
+            # In a production system, you might want to implement
+            # a method to clear all tracking entries if needed
+            print("[ingestion] Manual cleanup would require Redis FLUSHDB command")
+        else:
+            print("[ingestion] No active call tracking entries found")
+            
+    except Exception as ex:
+        print(f"[ingestion][error] Failed to cleanup call tracking: {ex}")
+    finally:
+        await call_tracker.close()
+
+
 if __name__ == "__main__":
-    asyncio.run(run_scheduler())
+    import sys
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "cleanup":
+        # Run cleanup mode
+        asyncio.run(cleanup_call_tracking())
+    else:
+        # Run normal scheduler
+        asyncio.run(run_scheduler())

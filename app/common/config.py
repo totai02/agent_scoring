@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     db_user: str = "agent"
     db_password: str = "agentpw"
     
+    # Redis configuration for call tracking
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str | None = None
+    call_tracking_ttl_seconds: int = 3600  # 1 hour TTL for call tracking
+    
     # STT Consumer optimization settings
     stt_max_workers: int = 4
     db_pool_size: int = 10

@@ -17,3 +17,4 @@ av>=11.0,<13
 faster-whisper==1.0.3
 torch
 torchaudio
+redis>=5.0.0

@@ -29,7 +29,7 @@ services:
 
   # Optional: Scale Kafka for higher throughput
   kafka-2:
-    image: bitnami/kafka:3.4.1
+    image: soldevelo/kafka:3.4.1
     container_name: kafka-2
     ports:
       - "9093:9093"

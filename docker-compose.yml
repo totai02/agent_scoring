@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
   kafka:
-    image: bitnami/kafka:3.4.1
+    image: soldevelo/kafka:3.4.1
     container_name: kafka-1
     ports:
       - "9092:9092"
@@ -80,7 +80,7 @@ services:
       sleep 2"
 
   create-kafka-topics:
-    image: bitnami/kafka:3.4.1
+    image: soldevelo/kafka:3.4.1
     depends_on:
       kafka:
         condition: service_healthy
